@@ -1,0 +1,52 @@
+[
+  {
+    "id": "IG Followers",
+    "name": "฿9.45",
+    "price": "฿8.51"
+  },
+  {
+    "id": "IG Likes",
+    "name": "฿0.69",
+    "price": "฿0.62"
+  },
+  {
+    "id": "IG Views",
+    "name": "฿0.13",
+    "price": "฿0.12"
+  },
+  {
+    "id": "TikTok Followers",
+    "name": "฿20.24",
+    "price": "฿18.22"
+  },
+  {
+    "id": "TikTok Likes",
+    "name": "฿0.99",
+    "price": "฿0.89"
+  },
+  {
+    "id": "TikTok Views",
+    "name": "฿0.50",
+    "price": "฿0.45"
+  },
+  {
+    "id": "YouTube Subscribers",
+    "name": "฿1,200.55",
+    "price": "฿1,080.50"
+  },
+  {
+    "id": "YouTube Views",
+    "name": "฿2.88",
+    "price": "฿2.59"
+  },
+  {
+    "id": "FB Page Likes",
+    "name": "฿40.12",
+    "price": "฿36.11"
+  },
+  {
+    "id": "FB Post Likes",
+    "name": "฿8.84",
+    "price": "฿7.96"
+  }
+]

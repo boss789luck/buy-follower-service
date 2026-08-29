@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Prisma Database
+dev.db
+dev.db-journal
+
+# Scratch files
+*.html
+*.txt

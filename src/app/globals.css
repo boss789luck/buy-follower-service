@@ -24,3 +24,68 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes gradient-x {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-blob {
+  animation: blob 10s infinite;
+}
+.animate-blob-delayed {
+  animation: blob 12s infinite;
+  animation-delay: 2s;
+}
+.animate-gradient-x {
+  animation: gradient-x 3s ease-in-out infinite;
+  background-size: 200% 200%;
+}
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes ig-spin {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes tiktok-glitch {
+  0% { text-shadow: 2px 0 0 #ff0050, -2px 0 0 #00f2fe; }
+  25% { text-shadow: -2px 0 0 #ff0050, 2px 0 0 #00f2fe; }
+  50% { text-shadow: 2px 0 0 #ff0050, -2px 0 0 #00f2fe; }
+  75% { text-shadow: -2px 0 0 #ff0050, 2px 0 0 #00f2fe; }
+  100% { text-shadow: 2px 0 0 #ff0050, -2px 0 0 #00f2fe; }
+}
+
+@keyframes line-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg) scale(1.1); }
+  75% { transform: rotate(10deg) scale(1.1); }
+}
+
+.animate-ig {
+  background-size: 200% 200%;
+  animation: ig-spin 3s ease infinite;
+}
+.animate-tiktok {
+  animation: tiktok-glitch 0.3s linear infinite;
+}
+.animate-line {
+  animation: line-wobble 1.5s ease-in-out infinite;
+}

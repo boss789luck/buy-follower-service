@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  balance   Float    @default(0)
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Service {
+  id             Int      @id @default(autoincrement()) // Our internal ID
+  originalId     Int
+  provider       String   @default("PANELSOCIAL")
+  name           String
+  originalPrice  Float    // Original rate per 1000
+  price          Float    // Our rate per 1000 (x2)
+  min            Int
+  max            Int
+  category       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  orders         Order[]
+}
+
+model Order {
+  id               String   @id @default(cuid())
+  userId           String
+  serviceId        Int
+  link             String
+  quantity         Int
+  charge           Float
+  status           String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, CANCELED
+  providerOrderId  String?  // ID returned by panelsocial.club after placing the order
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id])
+  service          Service  @relation(fields: [serviceId], references: [id])
+}
