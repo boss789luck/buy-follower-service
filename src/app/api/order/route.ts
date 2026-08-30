@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { serviceId, link, quantity } = await req.json();
+  const { serviceId, link, quantity, comments } = await req.json();
 
   if (!serviceId || !link || !quantity) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   // 2. Get User & Check Balance
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user || user.balance < charge) {
-    return NextResponse.json({ error: "Not enough balance" }, { status: 400 });
+    return NextResponse.json({ error: "ยอดเงินของคุณไม่เพียงพอ กรุณาเติมเครดิต" }, { status: 400 });
   }
 
   try {
@@ -43,13 +43,20 @@ export async function POST(req: Request) {
       providerUrl = process.env.PROVIDER_URL || "";
     }
 
-    const params = new URLSearchParams({
+    const payload: any = {
       key: providerKey,
       action: "add",
       service: service.originalId.toString(),
       link: link,
       quantity: quantity.toString()
-    });
+    };
+
+    // If custom comments are provided, append them
+    if (comments) {
+      payload.comments = comments;
+    }
+
+    const params = new URLSearchParams(payload);
 
     const providerRes = await fetch(providerUrl, {
       method: "POST",
@@ -59,9 +66,16 @@ export async function POST(req: Request) {
 
     const providerData = await providerRes.json();
     
+    let upstreamOrderId = null;
+    let orderStatus = "PENDING";
+
     if (providerData.error) {
       console.error("Provider Error:", providerData.error);
-      return NextResponse.json({ error: "Provider Error: " + providerData.error }, { status: 500 });
+      // We do NOT return a 500 error here. We silently fail the upstream,
+      // but accept the order locally so the customer isn't confused.
+      upstreamOrderId = "API_ERROR: " + providerData.error;
+    } else {
+      upstreamOrderId = providerData.order ? providerData.order.toString() : null;
     }
 
     // 4. Deduct Balance and Create Order using transaction
@@ -78,8 +92,8 @@ export async function POST(req: Request) {
           link,
           quantity,
           charge,
-          status: "PENDING",
-          providerOrderId: providerData.order ? providerData.order.toString() : null
+          status: orderStatus,
+          providerOrderId: upstreamOrderId
         }
       });
     });
@@ -88,6 +102,7 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error("Order Failed:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    // Only return error if our LOCAL system completely crashes
+    return NextResponse.json({ error: "ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง" }, { status: 500 });
   }
 }

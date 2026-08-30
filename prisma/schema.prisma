@@ -10,12 +10,14 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
+  email     String?  @unique
   password  String
   balance   Float    @default(0)
   role      String   @default("USER")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
+  deposits  Deposit[]
 }
 
 model Service {
@@ -47,4 +49,34 @@ model Order {
 
   user             User     @relation(fields: [userId], references: [id])
   service          Service  @relation(fields: [serviceId], references: [id])
+}
+
+model AdminConfig {
+  id                 String   @id @default("default")
+  coveredUserBalance Float    @default(0)
+  globalMarkup       Float    @default(1.5) // 1.5 = +50% profit
+  maintenanceMode    Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+}
+
+model Deposit {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Float
+  slipUrl   String   
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model ServiceUpdate {
+  id          String   @id @default(cuid())
+  serviceId   Int?
+  serviceName String
+  type        String   // "NEW", "PRICE_UP", "PRICE_DOWN", "DISABLED"
+  oldPrice    Float?
+  newPrice    Float?
+  createdAt   DateTime @default(now())
 }

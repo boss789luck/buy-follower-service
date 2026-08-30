@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowRight, LogIn, User, Lock } from "lucide-react";
+import { registerUser } from "./actions";
+import { Loader2, ArrowRight, UserPlus, Lock, Mail, User } from "lucide-react";
 import Link from "next/link";
 
-export default function LoginForm() {
+export default function SignupClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -17,25 +17,13 @@ export default function LoginForm() {
     setError("");
 
     const formData = new FormData(e.currentTarget);
-    const username = formData.get("username") as string;
-    const password = formData.get("password") as string;
+    const result = await registerUser(formData);
 
-    try {
-      const res = await signIn("credentials", {
-        username,
-        password,
-        redirect: false,
-      });
-
-      if (res?.error) {
-        setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
-        setLoading(false);
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
-    } catch (err) {
-      setError("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
+    if (result.success) {
+      alert("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ");
+      router.push("/");
+    } else {
+      setError(result.error || "เกิดข้อผิดพลาด");
       setLoading(false);
     }
   };
@@ -64,6 +52,19 @@ export default function LoginForm() {
 
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Mail className="h-5 w-5 text-gray-500" />
+          </div>
+          <input 
+            type="email" 
+            name="email"
+            required
+            placeholder="อีเมล (Email)" 
+            className="w-full bg-[#1f222a] border border-gray-800 text-white pl-11 pr-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium placeholder-gray-600"
+          />
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <Lock className="h-5 w-5 text-gray-500" />
           </div>
           <input 
@@ -74,6 +75,19 @@ export default function LoginForm() {
             className="w-full bg-[#1f222a] border border-gray-800 text-white pl-11 pr-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium placeholder-gray-600"
           />
         </div>
+
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Lock className="h-5 w-5 text-gray-500" />
+          </div>
+          <input 
+            type="password" 
+            name="confirmPassword"
+            required
+            placeholder="ยืนยันรหัสผ่านอีกครั้ง" 
+            className="w-full bg-[#1f222a] border border-gray-800 text-white pl-11 pr-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium placeholder-gray-600"
+          />
+        </div>
       </div>
 
       <button 
@@ -81,20 +95,15 @@ export default function LoginForm() {
         disabled={loading}
         className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center group shadow-lg shadow-blue-900/20 disabled:opacity-50 mt-2"
       >
-        {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <LogIn className="w-5 h-5 mr-2" />}
-        {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+        {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <UserPlus className="w-5 h-5 mr-2" />}
+        {loading ? "กำลังสร้างบัญชี..." : "สมัครสมาชิกฟรี"}
       </button>
 
       <div className="text-center mt-6">
         <p className="text-gray-500 text-sm">
-          ยังไม่มีบัญชีใช่ไหม?{" "}
-          <Link href="/signup" className="text-blue-400 font-bold hover:text-blue-300 transition-colors inline-flex items-center group">
-            สมัครสมาชิก <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </p>
-        <p className="text-gray-500 text-sm mt-4">
-          <Link href="/dashboard/services" className="hover:text-white transition-colors">
-            ดูรายชื่อบริการทั้งหมด (ไม่ต้องล็อกอิน)
+          มีบัญชีอยู่แล้วใช่ไหม?{" "}
+          <Link href="/" className="text-blue-400 font-bold hover:text-blue-300 transition-colors inline-flex items-center group">
+            เข้าสู่ระบบ <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
           </Link>
         </p>
       </div>
