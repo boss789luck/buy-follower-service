@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, AlertCircle, Search, Info, ShieldCheck, Zap, HelpCircle } from "lucide-react";
 
 type Service = {
@@ -14,6 +15,7 @@ type Service = {
 };
 
 export default function OrderForm({ services }: { services: Service[] }) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedServiceId, setSelectedServiceId] = useState<number | "">("");
@@ -117,6 +119,7 @@ export default function OrderForm({ services }: { services: Service[] }) {
         setLink("");
         setQuantity("");
         setCustomComments("");
+        router.refresh();
       }
     } catch (err) {
       setError("ระบบขัดข้อง ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
