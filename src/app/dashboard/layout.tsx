@@ -116,7 +116,12 @@ export default async function DashboardLayout({
                 คู่มือสำหรับมือใหม่
               </Link>
 
-              <a href="#" className="flex items-center px-4 py-3 text-sm font-semibold text-gray-700 rounded-2xl hover:bg-white hover:text-[#00B900] hover:shadow-sm hover:shadow-green-500/5 transition-all group">
+              <a 
+                href="https://lin.ee/xz3NJOp" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="flex items-center px-4 py-3 text-sm font-semibold text-gray-700 rounded-2xl hover:bg-white hover:text-[#00B900] hover:shadow-sm hover:shadow-green-500/5 transition-all group"
+              >
                 <MessageCircle className="w-5 h-5 mr-3 text-gray-400 group-hover:text-[#00B900] transition-colors" strokeWidth={2.5} />
                 ติดต่อแอดมิน (LINE)
               </a>
