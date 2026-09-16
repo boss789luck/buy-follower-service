@@ -13,9 +13,13 @@ export default async function AdminLayout({
 }) {
   const session = await auth();
   
-  // Basic admin check (Assuming testuser can access for now in this demo, but in real life check role)
   if (!session) {
-    redirect("/login");
+    redirect("/");
+  }
+
+  // Check admin role
+  if ((session.user as any)?.role !== "ADMIN" && session.user?.name !== "admin") {
+    redirect("/dashboard");
   }
 
   return (
