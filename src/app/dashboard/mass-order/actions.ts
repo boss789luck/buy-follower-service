@@ -26,7 +26,7 @@ export async function submitMassOrder(text: string) {
   // 1. Validate syntax and calculate total cost
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Format should be: serviceId|link|quantity
+    // Format: serviceId|link|quantity
     const parts = line.split("|").map(p => p.trim());
     
     if (parts.length !== 3) {
@@ -43,14 +43,23 @@ export async function submitMassOrder(text: string) {
       continue;
     }
 
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    // Support both internal id and PanelSocial originalId
+    const service = await prisma.service.findFirst({
+      where: {
+        OR: [
+          { id: serviceId },
+          { originalId: serviceId }
+        ]
+      }
+    });
+
     if (!service) {
       errors.push(`บรรทัดที่ ${i + 1}: ไม่พบบริการ ID ${serviceId}`);
       continue;
     }
 
     if (quantity < service.min || quantity > service.max) {
-      errors.push(`บรรทัดที่ ${i + 1}: จำนวนต้องอยู่ระหว่าง ${service.min} - ${service.max}`);
+      errors.push(`บรรทัดที่ ${i + 1}: จำนวนต้องอยู่ระหว่าง ${service.min} - ${service.max.toLocaleString()}`);
       continue;
     }
 
@@ -73,7 +82,10 @@ export async function submitMassOrder(text: string) {
   // 2. Check Balance
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user || user.balance < totalCost) {
-    return { success: false, error: `ยอดเงินไม่พอ (ยอดรวม: ฿${totalCost.toFixed(2)}, ยอดคงเหลือ: ฿${user?.balance.toFixed(2)})` };
+    return { 
+      success: false, 
+      error: `ยอดเงินไม่พอ (ยอดรวม: ฿${totalCost.toFixed(2)}, ยอดคงเหลือ: ฿${(user?.balance || 0).toFixed(2)})` 
+    };
   }
 
   // 3. Deduct total cost upfront
@@ -86,20 +98,12 @@ export async function submitMassOrder(text: string) {
   const failedOrders = [];
   let refundAmount = 0;
 
-  // 4. Place orders externally
+  const providerKey = process.env.PROVIDER_API_KEY || "";
+  const providerUrl = process.env.PROVIDER_URL || "";
+
+  // 4. Place orders externally via PanelSocial
   for (const order of parsedOrders) {
     try {
-      let providerKey = "";
-      let providerUrl = "";
-      
-      if (order.service.provider === "ADS4U") {
-        providerKey = process.env.ADS4U_API_KEY || "";
-        providerUrl = process.env.ADS4U_URL || "";
-      } else {
-        providerKey = process.env.PROVIDER_API_KEY || "";
-        providerUrl = process.env.PROVIDER_URL || "";
-      }
-
       const params = new URLSearchParams({
         key: providerKey,
         action: "add",
@@ -116,8 +120,11 @@ export async function submitMassOrder(text: string) {
 
       const providerData = await providerRes.json();
       
+      let upstreamOrderId = null;
       if (providerData.error) {
-        throw new Error(providerData.error);
+        upstreamOrderId = "API_ERROR: " + providerData.error;
+      } else {
+        upstreamOrderId = providerData.order ? providerData.order.toString() : null;
       }
 
       // Save to local DB
@@ -129,7 +136,7 @@ export async function submitMassOrder(text: string) {
           quantity: order.quantity,
           charge: order.charge,
           status: "PENDING",
-          providerOrderId: providerData.order ? providerData.order.toString() : null
+          providerOrderId: upstreamOrderId
         }
       });
 
@@ -138,7 +145,7 @@ export async function submitMassOrder(text: string) {
     } catch (err: any) {
       console.error("Mass Order Error:", err.message);
       failedOrders.push({ line: order.lineIndex, error: err.message });
-      refundAmount += order.charge; // Add back to refund pool
+      refundAmount += order.charge;
     }
   }
 

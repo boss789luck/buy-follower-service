@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 export async function getAdminConfig() {
   let config = await prisma.adminConfig.findUnique({ where: { id: "default" } });
   if (!config) {
-    config = await prisma.adminConfig.create({ data: { id: "default" } });
+    // Set default markup to 2.0 (x2)
+    config = await prisma.adminConfig.create({ data: { id: "default", globalMarkup: 2.0 } });
   }
   return config;
 }
@@ -19,10 +20,8 @@ export async function updateMarkup(markup: number) {
       data: { globalMarkup: markup }
     });
 
-    // Update only PanelSocial services with the global markup for now
-    // Ads4U is hardcoded to x3 in the database per user request
+    // Update all services to the new markup
     const services = await prisma.service.findMany({ 
-      where: { provider: "PANELSOCIAL" },
       select: { id: true, originalPrice: true }
     });
     
@@ -48,20 +47,11 @@ export async function updateMarkup(markup: number) {
 
 export async function syncServices() {
   try {
+    // Default to x2 if config doesn't exist
     const config = await getAdminConfig();
-    const markup = config.globalMarkup;
+    const markup = config.globalMarkup || 2.0;
 
-    // Fetch from Ads4U
-    const ads4uKey = process.env.ADS4U_API_KEY || "";
-    const ads4uUrl = process.env.ADS4U_URL || "";
-    let ads4uServices: any[] = [];
-    
-    if (ads4uKey && ads4uUrl) {
-      const res = await fetch(`${ads4uUrl}?key=${ads4uKey}&action=services`);
-      ads4uServices = await res.json();
-    }
-
-    // Fetch from PanelSocial
+    // Fetch from PanelSocial only
     const panelKey = process.env.PROVIDER_API_KEY || "";
     const panelUrl = process.env.PROVIDER_URL || "";
     let panelServices: any[] = [];
@@ -71,85 +61,30 @@ export async function syncServices() {
       panelServices = await res.json();
     }
 
-    // Combine logic (IG/LINE goes to PanelSocial, rest to Ads4U)
-    const newServiceData = [];
-
-    // Map Ads4U
-    if (Array.isArray(ads4uServices)) {
-      for (const s of ads4uServices) {
-        const category = String(s.category).toLowerCase();
-        if (category.includes('instagram') || category.includes('ig') || category.includes('line')) {
-          continue; // skip IG/LINE for Ads4U
-        }
-        const name = String(s.name).toLowerCase();
-        
-        // Exclude categories handled by PanelSocial
-        if (
-          category.includes('instagram') || 
-          category.includes('ig') || 
-          category.includes('line') ||
-          category.includes('คอมเม้นต์') ||
-          category.includes('รีวิว') ||
-          name.includes('ผู้ชาย') ||
-          name.includes('ผู้หญิง') ||
-          name.includes('คนไทย')
-        ) {
-          continue;
-        }
-        
-        newServiceData.push({
-          originalId: s.service,
-          provider: "ADS4U",
-          name: s.name,
-          category: s.category,
-          originalPrice: parseFloat(s.rate),
-          price: parseFloat(s.rate) * 3, // Hardcoded to x3 per user request
-          min: parseInt(s.min),
-          max: parseInt(s.max),
-          type: s.type || "Default"
-        });
-      }
+    if (!Array.isArray(panelServices) || panelServices.length === 0) {
+      return { success: false, error: "ไม่พบข้อมูลจาก Provider หรือ API Key ของ PanelSocial ผิดพลาด" };
     }
 
-    // (Removed duplicate fetch for PanelSocial services)
-    // Map PanelSocial
-    if (Array.isArray(panelServices)) {
-      for (const s of panelServices) {
-        const category = String(s.category).toLowerCase();
-        const name = String(s.name).toLowerCase();
-        // Route IG, LINE, and any premium Thai Comment services to PanelSocial
-        if (
-          category.includes('instagram') || 
-          category.includes('ig') || 
-          category.includes('line') ||
-          category.includes('คอมเม้นต์') ||
-          category.includes('รีวิว') ||
-          name.includes('ผู้ชาย') ||
-          name.includes('ผู้หญิง') ||
-          name.includes('คนไทย')
-        ) {
-          newServiceData.push({
-            originalId: s.service,
-            provider: "PANELSOCIAL",
-            name: s.name,
-            category: s.category,
-            originalPrice: parseFloat(s.rate),
-            price: parseFloat(s.rate) * markup,
-            min: parseInt(s.min),
-            max: parseInt(s.max),
-            type: s.type || "Default"
-          });
-        }
-      }
+    const newServiceData = [];
+
+    // Map PanelSocial (Fetch ALL services without filtering)
+    for (const s of panelServices) {
+      newServiceData.push({
+        originalId: s.service,
+        provider: "PANELSOCIAL",
+        name: s.name,
+        category: s.category,
+        originalPrice: parseFloat(s.rate),
+        price: parseFloat(s.rate) * markup, // Multiply by markup (default x2)
+        min: parseInt(s.min),
+        max: parseInt(s.max),
+        
+      });
     }
 
     if (newServiceData.length === 0) {
-      return { success: false, error: "ไม่พบข้อมูลจาก Provider หรือ API Key ผิดพลาด" };
+      return { success: false, error: "ไม่สามารถแปลงข้อมูลบริการจาก Provider ได้" };
     }
-
-    // In a real prod environment we'd carefully upsert to avoid changing local IDs.
-    // For this implementation, deleting all and recreating is fastest but breaks existing Order references.
-    // Let's do an upsert approach instead to be safe with existing orders.
     
     // Get existing services by originalId + provider
     const existing = await prisma.service.findMany({ select: { id: true, originalId: true, provider: true, originalPrice: true, price: true } });
@@ -201,13 +136,31 @@ export async function syncServices() {
       }
     }
 
+    // Identify services that exist in DB but are no longer provided by PanelSocial
+    const newServiceIds = new Set(newServiceData.map(s => `${s.provider}_${s.originalId}`));
+    const servicesToDelete = existing.filter(e => e.provider !== "PANELSOCIAL" || !newServiceIds.has(`${e.provider}_${e.originalId}`));
+    
+    if (servicesToDelete.length > 0) {
+      // NOTE: We cannot simply delete them if they are linked to Orders.
+      // Usually, it's safer to just let them be or mark as hidden. 
+      // For this cleanup since we are migrating strictly to PanelSocial, 
+      // if an order references an Ads4U service, deleting the service will fail due to foreign key constraints.
+      // So we will attempt to delete them, but ignore errors for linked services.
+      for (const s of servicesToDelete) {
+        try {
+          await prisma.service.delete({ where: { id: s.id } });
+        } catch (e) {
+          // Ignore foreign key errors, just leave the service in the DB.
+        }
+      }
+    }
+
     // Insert update logs (keep top 50 to avoid bloat)
     if (updateLogs.length > 0) {
       await prisma.serviceUpdate.createMany({
         data: updateLogs
       });
       
-      // Cleanup old logs (optional, simple logic: just delete older than 30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       await prisma.serviceUpdate.deleteMany({

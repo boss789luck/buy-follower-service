@@ -31,17 +31,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 3. Forward to Provider
-    let providerKey = "";
-    let providerUrl = "";
-    
-    if (service.provider === "ADS4U") {
-      providerKey = process.env.ADS4U_API_KEY || "";
-      providerUrl = process.env.ADS4U_URL || "";
-    } else {
-      providerKey = process.env.PROVIDER_API_KEY || "";
-      providerUrl = process.env.PROVIDER_URL || "";
-    }
+    // 3. Forward to Provider (Always PanelSocial)
+    const providerKey = process.env.PROVIDER_API_KEY || "";
+    const providerUrl = process.env.PROVIDER_URL || "";
 
     const payload: any = {
       key: providerKey,

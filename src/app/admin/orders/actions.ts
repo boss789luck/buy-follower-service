@@ -75,7 +75,6 @@ export async function syncAllOrdersStatus() {
       return { success: true, message: "ไม่มีออเดอร์ที่ต้องอัปเดต" };
     }
 
-    const ads4uOrders = validOrders.filter(o => o.service.provider === "ADS4U");
     const panelSocialOrders = validOrders.filter(o => o.service.provider === "PANELSOCIAL");
 
     let updatedCount = 0;
@@ -140,7 +139,6 @@ export async function syncAllOrdersStatus() {
     };
 
     // --- Execute syncs ---
-    await syncBatch(ads4uOrders, process.env.ADS4U_URL || "", process.env.ADS4U_API_KEY || "");
     await syncBatch(panelSocialOrders, process.env.PROVIDER_URL || "", process.env.PROVIDER_API_KEY || "");
 
     revalidatePath("/admin/orders");
