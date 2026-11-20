@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export async function registerUser(formData: FormData) {
-  const username = formData.get("username") as string;
-  const email = formData.get("email") as string;
+  const username = (formData.get("username") as string)?.trim();
+  const email = (formData.get("email") as string)?.trim().toLowerCase();
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
 

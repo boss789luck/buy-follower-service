@@ -74,6 +74,15 @@ export default function LoginForm() {
             className="w-full bg-[#1f222a] border border-gray-800 text-white pl-11 pr-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium placeholder-gray-600"
           />
         </div>
+
+        <div className="flex justify-end">
+          <Link 
+            href="/forgot-password" 
+            className="text-xs font-semibold text-gray-400 hover:text-blue-400 transition-colors"
+          >
+            ลืมรหัสผ่าน?
+          </Link>
+        </div>
       </div>
 
       <button 

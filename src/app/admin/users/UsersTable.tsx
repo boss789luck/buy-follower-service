@@ -1,12 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Edit, Wallet, User as UserIcon, Shield, X, Save } from "lucide-react";
-import { updateUserBalance } from "./actions";
+import {
+  Search,
+  Edit,
+  Wallet,
+  User as UserIcon,
+  Shield,
+  X,
+  Save,
+  KeyRound,
+  CheckCircle2,
+} from "lucide-react";
+import { updateUserBalance, adminResetUserPassword } from "./actions";
 
 type UserType = {
   id: string;
   username: string;
+  email: string | null;
   balance: number;
   role: string;
   createdAt: Date;
@@ -16,17 +27,27 @@ type UserType = {
 export default function UsersTable({ initialUsers }: { initialUsers: UserType[] }) {
   const [users, setUsers] = useState<UserType[]>(initialUsers);
   const [search, setSearch] = useState("");
-  
-  // Modal State
+
+  // Balance Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [balanceInput, setBalanceInput] = useState<string>("");
   const [modifyType, setModifyType] = useState<"add" | "deduct" | "set">("add");
   const [isSaving, setIsSaving] = useState(false);
 
-  const filteredUsers = users.filter(u => 
-    u.username.toLowerCase().includes(search.toLowerCase()) || 
-    u.id.toLowerCase().includes(search.toLowerCase())
+  // Password Reset Modal State
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordTargetUser, setPasswordTargetUser] = useState<UserType | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
+  const filteredUsers = users.filter(
+    (u) =>
+      u.username.toLowerCase().includes(search.toLowerCase()) ||
+      (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
+      u.id.toLowerCase().includes(search.toLowerCase())
   );
 
   const openModal = (user: UserType) => {
@@ -36,19 +57,28 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
     setIsModalOpen(true);
   };
 
+  const openPasswordModal = (user: UserType) => {
+    setPasswordTargetUser(user);
+    setNewPasswordInput("");
+    setPasswordSuccess(false);
+    setPasswordError("");
+    setIsPasswordModalOpen(true);
+  };
+
   const handleSave = async () => {
     if (!selectedUser || !balanceInput || isNaN(Number(balanceInput))) return;
-    
+
     setIsSaving(true);
     const amount = Number(balanceInput);
-    
+
     const result = await updateUserBalance(selectedUser.id, amount, modifyType);
-    
+
     if (result.success) {
-      // Update local state to reflect changes instantly without hard refresh
-      setUsers(users.map(u => 
-        u.id === selectedUser.id ? { ...u, balance: result.newBalance! } : u
-      ));
+      setUsers(
+        users.map((u) =>
+          u.id === selectedUser.id ? { ...u, balance: result.newBalance! } : u
+        )
+      );
       setIsModalOpen(false);
     } else {
       alert(result.error);
@@ -56,16 +86,42 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
     setIsSaving(false);
   };
 
+  const handleSavePassword = async () => {
+    if (!passwordTargetUser) return;
+    if (newPasswordInput.length < 6) {
+      setPasswordError("รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร");
+      return;
+    }
+
+    setIsSavingPassword(true);
+    setPasswordError("");
+
+    const result = await adminResetUserPassword(
+      passwordTargetUser.id,
+      newPasswordInput
+    );
+
+    setIsSavingPassword(false);
+
+    if (result.success) {
+      setPasswordSuccess(true);
+      setTimeout(() => {
+        setIsPasswordModalOpen(false);
+      }, 1500);
+    } else {
+      setPasswordError(result.error || "เกิดข้อผิดพลาด");
+    }
+  };
+
   return (
     <div className="space-y-6">
-      
       {/* Search Bar */}
       <div className="flex justify-between items-center bg-[#1a1d24] p-4 rounded-2xl border border-gray-800">
         <div className="relative w-full max-w-md">
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input 
-            type="text" 
-            placeholder="ค้นหาชื่อผู้ใช้งาน หรือ ID..." 
+          <input
+            type="text"
+            placeholder="ค้นหาชื่อผู้ใช้งาน, อีเมล หรือ ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#0f1115] border border-gray-700 text-white pl-10 pr-4 py-2 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
@@ -96,50 +152,65 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
                     ไม่พบผู้ใช้งานที่ค้นหา
                   </td>
                 </tr>
-              ) : filteredUsers.map(user => (
-                <tr key={user.id} className="hover:bg-[#252830] transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold uppercase">
-                        {user.username.substring(0,2)}
+              ) : (
+                filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-[#252830] transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold uppercase">
+                          {user.username.substring(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-white font-bold">{user.username}</p>
+                          <p className="text-xs text-gray-400">
+                            {user.email || "ไม่ได้ระบุอีเมล"}
+                          </p>
+                          <p className="text-[11px] text-gray-600 font-mono mt-0.5">
+                            ID: {user.id.substring(0, 8)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-white font-bold">{user.username}</p>
-                        <p className="text-xs text-gray-500 font-mono mt-0.5">ID: {user.id.substring(0,8)}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.role === "ADMIN" ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/20 text-red-400 text-xs font-bold">
+                          <Shield className="w-3 h-3 mr-1" /> ADMIN
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-gray-700 text-gray-300 text-xs font-bold">
+                          <UserIcon className="w-3 h-3 mr-1" /> USER
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-lg font-black text-emerald-400">
+                        ฿{user.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-gray-300 bg-gray-800 px-3 py-1 rounded-full text-xs font-bold">
+                        {user._count.orders} รายการ
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="inline-flex items-center space-x-2">
+                        <button
+                          onClick={() => openModal(user)}
+                          className="inline-flex items-center px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-bold transition-all"
+                        >
+                          <Wallet className="w-3 h-3 mr-1.5" /> จัดการยอดเงิน
+                        </button>
+                        <button
+                          onClick={() => openPasswordModal(user)}
+                          className="inline-flex items-center px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-bold transition-all"
+                        >
+                          <KeyRound className="w-3 h-3 mr-1.5" /> รีเซ็ตรหัส
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {user.role === 'ADMIN' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/20 text-red-400 text-xs font-bold">
-                        <Shield className="w-3 h-3 mr-1" /> ADMIN
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded bg-gray-700 text-gray-300 text-xs font-bold">
-                        <UserIcon className="w-3 h-3 mr-1" /> USER
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-lg font-black text-emerald-400">
-                      ฿{user.balance.toLocaleString(undefined, {minimumFractionDigits: 2})}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="text-gray-300 bg-gray-800 px-3 py-1 rounded-full text-xs font-bold">
-                      {user._count.orders} รายการ
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button 
-                      onClick={() => openModal(user)}
-                      className="inline-flex items-center px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-bold transition-all"
-                    >
-                      <Wallet className="w-3 h-3 mr-1.5" /> จัดการยอดเงิน
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -154,41 +225,62 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
                 <Edit className="w-5 h-5 mr-2 text-blue-500" />
                 จัดการยอดเงินลูกค้า
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white transition-colors">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-500 hover:text-white transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-6">
               {/* User Info */}
               <div className="bg-[#0f1115] p-4 rounded-xl border border-gray-800 flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Username</p>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
+                    Username
+                  </p>
                   <p className="text-white font-bold text-lg">{selectedUser.username}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">ยอดปัจจุบัน</p>
-                  <p className="text-emerald-400 font-black text-xl">฿{selectedUser.balance.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
+                    ยอดปัจจุบัน
+                  </p>
+                  <p className="text-emerald-400 font-black text-xl">
+                    ฿{selectedUser.balance.toLocaleString()}
+                  </p>
                 </div>
               </div>
 
               {/* Action Type Selector */}
               <div className="grid grid-cols-3 gap-2">
-                <button 
+                <button
                   onClick={() => setModifyType("add")}
-                  className={`py-2 rounded-lg text-sm font-bold border transition-all ${modifyType === 'add' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0f1115] border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                  className={`py-2 rounded-lg text-sm font-bold border transition-all ${
+                    modifyType === "add"
+                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                      : "bg-[#0f1115] border-gray-700 text-gray-400 hover:border-gray-500"
+                  }`}
                 >
                   บวกเพิ่ม (+)
                 </button>
-                <button 
+                <button
                   onClick={() => setModifyType("deduct")}
-                  className={`py-2 rounded-lg text-sm font-bold border transition-all ${modifyType === 'deduct' ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-[#0f1115] border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                  className={`py-2 rounded-lg text-sm font-bold border transition-all ${
+                    modifyType === "deduct"
+                      ? "bg-red-500/20 border-red-500 text-red-400"
+                      : "bg-[#0f1115] border-gray-700 text-gray-400 hover:border-gray-500"
+                  }`}
                 >
                   หักลบ (-)
                 </button>
-                <button 
+                <button
                   onClick={() => setModifyType("set")}
-                  className={`py-2 rounded-lg text-sm font-bold border transition-all ${modifyType === 'set' ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-[#0f1115] border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                  className={`py-2 rounded-lg text-sm font-bold border transition-all ${
+                    modifyType === "set"
+                      ? "bg-blue-500/20 border-blue-500 text-blue-400"
+                      : "bg-[#0f1115] border-gray-700 text-gray-400 hover:border-gray-500"
+                  }`}
                 >
                   ตั้งค่าคงที่ (=)
                 </button>
@@ -196,10 +288,14 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
 
               {/* Amount Input */}
               <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">จำนวนเงิน (บาท)</label>
+                <label className="block text-sm font-bold text-gray-400 mb-2">
+                  จำนวนเงิน (บาท)
+                </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">฿</span>
-                  <input 
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
+                    ฿
+                  </span>
+                  <input
                     type="number"
                     value={balanceInput}
                     onChange={(e) => setBalanceInput(e.target.value)}
@@ -208,15 +304,23 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  {modifyType === 'add' && "ยอดรวมสุทธิจะเป็น: ฿" + (selectedUser.balance + Number(balanceInput || 0)).toLocaleString()}
-                  {modifyType === 'deduct' && "ยอดรวมสุทธิจะเป็น: ฿" + Math.max(0, selectedUser.balance - Number(balanceInput || 0)).toLocaleString()}
-                  {modifyType === 'set' && "ยอดรวมสุทธิจะเป็น: ฿" + Number(balanceInput || 0).toLocaleString()}
+                  {modifyType === "add" &&
+                    "ยอดรวมสุทธิจะเป็น: ฿" +
+                      (selectedUser.balance + Number(balanceInput || 0)).toLocaleString()}
+                  {modifyType === "deduct" &&
+                    "ยอดรวมสุทธิจะเป็น: ฿" +
+                      Math.max(
+                        0,
+                        selectedUser.balance - Number(balanceInput || 0)
+                      ).toLocaleString()}
+                  {modifyType === "set" &&
+                    "ยอดรวมสุทธิจะเป็น: ฿" + Number(balanceInput || 0).toLocaleString()}
                 </p>
               </div>
 
               {/* Action Buttons */}
               <div className="pt-2">
-                <button 
+                <button
                   onClick={handleSave}
                   disabled={isSaving || !balanceInput || Number(balanceInput) < 0}
                   className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl flex justify-center items-center transition-colors"
@@ -235,6 +339,83 @@ export default function UsersTable({ initialUsers }: { initialUsers: UserType[] 
         </div>
       )}
 
+      {/* Reset Password Modal */}
+      {isPasswordModalOpen && passwordTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#1a1d24] border border-gray-700 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-800">
+              <h3 className="text-xl font-bold text-white flex items-center">
+                <KeyRound className="w-5 h-5 mr-2 text-amber-400" />
+                รีเซ็ตรหัสผ่านผู้ใช้
+              </h3>
+              <button
+                onClick={() => setIsPasswordModalOpen(false)}
+                className="text-gray-500 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="bg-[#0f1115] p-4 rounded-xl border border-gray-800">
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
+                  บัญชีที่กำลังตั้งรหัสผ่านใหม่
+                </p>
+                <p className="text-white font-bold text-lg">
+                  {passwordTargetUser.username}
+                </p>
+                {passwordTargetUser.email && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {passwordTargetUser.email}
+                  </p>
+                )}
+              </div>
+
+              {passwordSuccess ? (
+                <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl flex items-center justify-center space-x-2 font-bold">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>เปลี่ยนรหัสผ่านเรียบร้อยแล้ว!</span>
+                </div>
+              ) : (
+                <>
+                  {passwordError && (
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold p-3 rounded-xl text-center">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-2">
+                      รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)
+                    </label>
+                    <input
+                      type="text"
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      placeholder="กรอกรหัสผ่านใหม่..."
+                      className="w-full bg-[#0f1115] border border-gray-700 text-white font-bold text-base px-4 py-3 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleSavePassword}
+                    disabled={isSavingPassword || newPasswordInput.length < 6}
+                    className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl flex justify-center items-center transition-colors"
+                  >
+                    {isSavingPassword ? (
+                      <span className="animate-pulse">กำลังบันทึก...</span>
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5 mr-2" /> บันทึกรหัสผ่านใหม่
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
